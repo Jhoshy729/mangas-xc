@@ -146,7 +146,23 @@
 
 // Nueva función para borrar de Supabase
 async function eliminarManga(id) {
-    if (!confirm("¿Realmente quieres eliminar este manga?")) return;
+    // 1. Verificación de seguridad
+    const password = prompt("Ingresa la contraseña de administrador para eliminar:");
+    
+    // Cambia '1234' por la clave que tú quieras
+    if (password !== "2005") {
+        alert("Contraseña incorrecta. No tienes permiso para borrar.");
+        return;
+    }
+
+    // 2. Confirmación final
+    if (!confirm("¿Estás seguro de eliminar este registro?")) return;
+
+    // 3. Validación del ID (Para evitar el error de 'null')
+    if (!id) {
+        alert("Error: No se encontró el ID del archivo.");
+        return;
+    }
 
     const { error } = await supabaseClient
         .from('archivos')
@@ -156,8 +172,8 @@ async function eliminarManga(id) {
     if (error) {
         alert("Error al eliminar: " + error.message);
     } else {
-        alert("Manga eliminado de la base de datos.");
-        location.reload();
+        alert("Manga eliminado con éxito.");
+        location.reload(); // Recarga para actualizar la lista
     }
 }
 
