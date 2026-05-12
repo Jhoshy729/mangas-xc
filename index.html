@@ -12,45 +12,42 @@
     <div class="max-w-5xl mx-auto p-6">
         <header class="flex justify-between items-center py-10 border-b border-gray-800 mb-10">
             <div>
-                <h1 class="text-4xl font-black tracking-tighter uppercase text-cyan-500">:D<span class="text-white">MangasXc</span></h1>
+                <h1 class="text-4xl font-black tracking-tighter uppercase text-cyan-500">:D<span class="text-white">Mangas Xc</span></h1>
                 <p class="text-gray-500 italic">Bienvenidos a MangasXc, subo animes gore y te doy la oportunidad de subir tus mangas FUERTES gore tambien.</p>
             </div>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            <!-- Sección de Subida con Aviso de Límite -->
-<aside class="space-y-6">
-    <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-xl">
-        <h2 class="text-xl font-bold mb-2">Subir Documento</h2>
-        <!-- Cuadrícula de aviso -->
-        <div class="mb-4 p-3 bg-cyan-950/30 border border-cyan-800 rounded-lg">
-            <p class="text-xs text-cyan-400 font-mono uppercase tracking-widest mb-1">Restricción de Servidor</p>
-            <p class="text-sm text-gray-300">Máximo permitido: <span class="text-white font-bold text-lg">10 MB</span></p>
-            <p class="text-[10px] text-gray-500 mt-1 italic">* Si pesa más, el sistema lo rechazará automáticamente.</p>
-        </div>
+            <!-- Sección de Subida -->
+            <aside class="space-y-6">
+                <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-xl">
+                    <h2 class="text-xl font-bold mb-2">Subir Documento</h2>
+                    <div class="mb-4 p-3 bg-cyan-950/30 border border-cyan-800 rounded-lg">
+                        <p class="text-xs text-cyan-400 font-mono uppercase tracking-widest mb-1">Servidor: Supabase Storage</p>
+                        <p class="text-sm text-gray-300">Estado: <span class="text-white font-bold text-lg">Activo</span></p>
+                        <p class="text-[10px] text-gray-500 mt-1 italic">* Los PDFs se guardan directamente sin procesar.</p>
+                    </div>
 
-        <div class="space-y-4">
-            <input type="text" id="pdfTitle" placeholder="Título del PDF..." 
-                   class="w-full bg-gray-800 border-none rounded-lg p-3 outline-none focus:ring-2 focus:ring-cyan-500 text-white">
-            <input type="file" id="pdfFile" accept=".pdf" 
-                   class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer">
-            <button onclick="subirTodo()" id="btnAccion" class="w-full bg-white text-black font-black py-3 rounded-lg hover:bg-cyan-400 transition uppercase tracking-widest">
-                Publicar
-            </button>
-        </div>
-    </div>
-</aside>
+                    <div class="space-y-4">
+                        <input type="text" id="pdfTitle" placeholder="Título del PDF..." 
+                               class="w-full bg-gray-800 border-none rounded-lg p-3 outline-none focus:ring-2 focus:ring-cyan-500 text-white">
+                        <input type="file" id="pdfFile" accept=".pdf" 
+                               class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer">
+                        <button onclick="subirTodo()" id="btnAccion" class="w-full bg-white text-black font-black py-3 rounded-lg hover:bg-cyan-400 transition uppercase tracking-widest">
+                            Publicar
+                        </button>
+                    </div>
+                </div>
+            </aside>
 
             <main class="lg:col-span-2 space-y-8" id="pdfFeed">
-                <p class="text-gray-600">Cargando base de datos...</p>
+                <p class="text-gray-600">Conectando con Supabase...</p>
             </main>
         </div>
     </div>
 
     <script>
         // --- CONFIGURACIÓN ---
-        const CLOUD_NAME = 'dm57fnquw'; 
-        const UPLOAD_PRESET = 'preset_jhoshy'; 
         const SUPABASE_URL = 'https://bfdmzcchoablcmgafeuf.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_vAeSmujzwqN75FCzE-Oc4Q_cq5jLLe8'; 
 
@@ -64,135 +61,113 @@
 
             if (!file || !titulo) return alert("Por favor, llena todos los campos.");
 
-            btn.innerText = "Subiendo...";
+            btn.innerText = "Subiendo archivo...";
             btn.disabled = true;
 
             try {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', UPLOAD_PRESET);
+                // 1. Generar nombre de archivo único para evitar choques
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Date.now()}.${fileExt}`;
 
-                // CORRECCIÓN: Usamos /auto/upload para que acepte PDFs sin problemas
-                const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, {
-                    method: 'POST',
-                    body: formData
-                });
+                // 2. Subir al Bucket 'mangas' (referencia a image_80a8fc.png)
+                const { data: uploadData, error: uploadError } = await supabaseClient
+                    .storage
+                    .from('mangas')
+                    .upload(fileName, file);
 
-                const dataCloud = await resCloud.json();
+                if (uploadError) throw uploadError;
 
-                // Diagnóstico en caso de error de Cloudinary
-                if (dataCloud.error) {
-                    throw new Error(dataCloud.error.message);
-                }
+                // 3. Obtener URL pública
+                const { data: { publicUrl } } = supabaseClient
+                    .storage
+                    .from('mangas')
+                    .getPublicUrl(fileName);
 
-                // Registro en Supabase
-                const { error } = await supabaseClient
+                // 4. Registrar en la tabla 'archivos'
+                const { error: dbError } = await supabaseClient
                     .from('archivos')
                     .insert([{ 
                         nombre: titulo, 
-                        url: dataCloud.secure_url, 
+                        url: publicUrl,
                         uuid: 'b63e15c5-f9cd-4509-ae0f-f2c031cf6ccf' 
                     }]);
 
-                if (error) throw error;
+                if (dbError) throw dbError;
 
-                alert("¡Manga publicado con éxito!");
+                alert("¡Manga publicado con éxito en Supabase!");
                 location.reload();
 
             } catch (err) {
-                // Mensaje detallado del error
                 alert("Error: " + err.message);
-                console.error("Detalle del error:", err);
+                console.error(err);
             } finally {
                 btn.innerText = "Publicar";
                 btn.disabled = false;
             }
         }
 
-      async function cargarLista() {
-    const feed = document.getElementById('pdfFeed');
-    const { data: archivos, error } = await supabaseClient
-        .from('archivos')
-        .select('*')
-        .order('created_at', { ascending: false });
+        async function cargarLista() {
+            const feed = document.getElementById('pdfFeed');
+            const { data: archivos, error } = await supabaseClient
+                .from('archivos')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-    if (error) return console.error(error);
+            if (error) return console.error(error);
 
-    feed.innerHTML = archivos.map(pdf => {
-        // 1. Limpiamos la URL de transformaciones previas para evitar el Error 401
-        // Esto quita cualquier "fl_attachment" que se haya guardado mal
-        let urlLimpia = pdf.url.replace(/upload\/v\d+\//, 'upload/');
-        
-        // 2. Creamos la URL de descarga estándar de Cloudinary
-        // Usamos la URL tal cual viene de la base de datos pero asegurando el modo descarga
-        let urlDescarga = urlLimpia.replace('/upload/', '/upload/fl_attachment/');
-// Dentro de tu archivos.map(pdf => { ... })
+            if (archivos.length === 0) {
+                feed.innerHTML = '<p class="text-gray-600">No hay mangas subidos aún.</p>';
+                return;
+            }
 
-// 1. Usamos la URL original sin forzar transformaciones de texto que causen el 401
-const urlOriginal = pdf.url;
+            feed.innerHTML = archivos.map(pdf => {
+                return `
+                    <div class="bg-gray-900 p-8 rounded-3xl border border-gray-800 shadow-2xl transition hover:border-cyan-500 group">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="text-2xl font-bold text-white group-hover:text-cyan-400 transition">${pdf.nombre}</h3>
+                                <p class="text-gray-500 text-xs font-mono mt-1 uppercase tracking-tighter">ID: ${pdf.id}</p>
+                            </div>
+                            <div class="flex gap-3">
+                                <button onclick="eliminarManga(${pdf.id})" class="text-gray-600 hover:text-red-500 transition p-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                                
+                                <a href="${pdf.url}" 
+                                   download="${pdf.nombre.replace(/\s+/g, '_')}.pdf" 
+                                   target="_blank" 
+                                   class="bg-white text-black p-3 rounded-full hover:bg-cyan-500 transition shadow-lg">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
 
-return `
-    <div class="bg-gray-900 p-8 rounded-3xl border border-gray-800 shadow-2xl transition hover:border-cyan-500 group">
-        <div class="flex justify-between items-start">
-            <div>
-                <h3 class="text-2xl font-bold text-white group-hover:text-cyan-400 transition">${pdf.nombre}</h3>
-                <p class="text-gray-500 text-xs font-mono mt-1 uppercase tracking-tighter">Registro #${pdf.id}</p>
-            </div>
-            <div class="flex gap-3">
-                <button onclick="eliminarManga(${pdf.id})" class="text-gray-600 hover:text-red-500 transition p-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                    </svg>
-                </button>
-                
-                <!-- SOLUCIÓN: Atributo download y URL directa -->
-                <a href="${urlOriginal}" 
-                   download="${pdf.nombre.replace(/\s+/g, '_')}.pdf" 
-                   target="_blank" 
-                   class="bg-white text-black p-3 rounded-full hover:bg-cyan-500 transition shadow-lg">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </div>
-`;
-    }).join('');
-}
+        async function eliminarManga(id) {
+            const password = prompt("Ingresa la contraseña de administrador:");
+            if (password !== "2005") return alert("Acceso denegado.");
 
-// Nueva función para borrar de Supabase
-async function eliminarManga(id) {
-    // 1. Verificación de seguridad
-    const password = prompt("Ingresa la contraseña de administrador para eliminar:");
-    
-    // Cambia '1234' por la clave que tú quieras
-    if (password !== "2005") {
-        alert("Contraseña incorrecta. No tienes permiso para borrar.");
-        return;
-    }
+            if (!confirm("¿Eliminar este manga?")) return;
 
-    // 2. Confirmación final
-    if (!confirm("¿Estás seguro de eliminar este registro?")) return;
+            const { error } = await supabaseClient
+                .from('archivos')
+                .delete()
+                .eq('id', id);
 
-    // 3. Validación del ID (Para evitar el error de 'null')
-    if (!id) {
-        alert("Error: No se encontró el ID del archivo.");
-        return;
-    }
-
-    const { error } = await supabaseClient
-        .from('archivos')
-        .delete()
-        .eq('id', id);
-
-    if (error) {
-        alert("Error al eliminar: " + error.message);
-    } else {
-        alert("Manga eliminado con éxito.");
-        location.reload(); // Recarga para actualizar la lista
-    }
-}
+            if (error) {
+                alert("Error: " + error.message);
+            } else {
+                alert("Eliminado.");
+                location.reload();
+            }
+        }
 
         cargarLista();
     </script>
