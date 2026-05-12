@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> Mangas|Xc</title>
+    <title>Mangas|Xc</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -40,15 +40,17 @@
     </div>
 
     <script>
+        // --- CONFIGURACIÓN ---
         const CLOUD_NAME = 'dm57fnquw'; 
-        const UPLOAD_PRESET = 'preset_jhoshy'; // Revisa que este nombre sea igual en Cloudinary
+        const UPLOAD_PRESET = 'preset_jhoshy'; 
         const SUPABASE_URL = 'https://bfdmzcchoablcmgafeuf.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_vAeSmujzwqN75FCzE-Oc4Q_cq5jLLe8'; 
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function subirTodo() {
-            const file = document.getElementById('pdfFile').files[0];
+            const fileInput = document.getElementById('pdfFile');
+            const file = fileInput.files[0];
             const titulo = document.getElementById('pdfTitle').value;
             const btn = document.getElementById('btnAccion');
 
@@ -62,14 +64,20 @@
                 formData.append('file', file);
                 formData.append('upload_preset', UPLOAD_PRESET);
 
-                const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, {
+                // CORRECCIÓN: Usamos /auto/upload para que acepte PDFs sin problemas
+                const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, {
                     method: 'POST',
                     body: formData
                 });
+
                 const dataCloud = await resCloud.json();
 
-                if (!dataCloud.secure_url) throw new Error("Error en Cloudinary");
+                // Diagnóstico en caso de error de Cloudinary
+                if (dataCloud.error) {
+                    throw new Error(dataCloud.error.message);
+                }
 
+                // Registro en Supabase
                 const { error } = await supabaseClient
                     .from('archivos')
                     .insert([{ 
@@ -80,12 +88,13 @@
 
                 if (error) throw error;
 
-                alert("¡Documento sincronizado!");
+                alert("¡Manga publicado con éxito!");
                 location.reload();
 
             } catch (err) {
-                alert("Error: Revisa que el preset en Cloudinary sea 'No firmado'.");
-                console.error(err);
+                // Mensaje detallado del error
+                alert("Error: " + err.message);
+                console.error("Detalle del error:", err);
             } finally {
                 btn.innerText = "Publicar";
                 btn.disabled = false;
@@ -99,7 +108,15 @@
                 .select('*')
                 .order('created_at', { ascending: false });
 
-            if (error) return console.error(error);
+            if (error) {
+                feed.innerHTML = `<p class="text-red-500">Error al cargar datos.</p>`;
+                return console.error(error);
+            }
+
+            if (archivos.length === 0) {
+                feed.innerHTML = `<p class="text-gray-500 italic">No hay mangas publicados aún.</p>`;
+                return;
+            }
 
             feed.innerHTML = archivos.map(pdf => `
                 <div class="bg-gray-900 p-8 rounded-3xl border border-gray-800 shadow-2xl transition hover:border-cyan-500 group">
@@ -109,7 +126,9 @@
                             <p class="text-gray-500 text-xs font-mono mt-1 uppercase tracking-tighter">${pdf.uuid}</p>
                         </div>
                         <a href="${pdf.url.replace('/upload/', '/upload/fl_attachment/')}" target="_blank" class="bg-white text-black p-3 rounded-full hover:bg-cyan-500 transition shadow-lg">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
                         </a>
                     </div>
                 </div>
